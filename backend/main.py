@@ -30,6 +30,8 @@ def _ensure_schema():
         for col, ddl in [
             ("progress_current", "ALTER TABLE download_queue ADD COLUMN progress_current INTEGER NOT NULL DEFAULT 0"),
             ("progress_total",   "ALTER TABLE download_queue ADD COLUMN progress_total INTEGER NOT NULL DEFAULT 0"),
+            ("metadata_synced_at",  "ALTER TABLE series ADD COLUMN metadata_synced_at DATETIME"),
+            ("metadata_synced_url", "ALTER TABLE series ADD COLUMN metadata_synced_url TEXT"),
         ]:
             try:
                 conn.execute(text(ddl))

@@ -122,6 +122,32 @@ export default function SeriesCard({ series, selectionMode, selected, onToggleSe
         }}>
           {badge.label}
         </div>
+        {/* Metadata up-to-date checkmark — shown when a series.json has been
+            written for the current metadata_url. Sits just below the status
+            badge so the top-right column reads: status → synced. */}
+        {series.metadata_synced_at && (
+          <div
+            title={`Metadata synced ${new Date(series.metadata_synced_at).toLocaleString()}`}
+            style={{
+              position: 'absolute',
+              top: 28,
+              right: 6,
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              background: '#22c55e',
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 0 2px rgba(15,23,42,0.5)',
+            }}
+          >
+            ✓
+          </div>
+        )}
         {/* Source badge bottom-left over a subtle gradient */}
         <div style={{
           position: 'absolute',

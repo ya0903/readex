@@ -17,6 +17,11 @@ class Series(Base):
     content_type: Mapped[str] = mapped_column(String, nullable=False)  # manga, manhwa, comic
     status: Mapped[str] = mapped_column(String, nullable=False)  # ongoing, complete
     metadata_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Tracks the last-successful metadata sync so bulk "Sync All" can skip
+    # series whose metadata hasn't changed. Cleared when the user edits
+    # metadata_url via PATCH, and refreshed whenever a sync writes series.json.
+    metadata_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    metadata_synced_url: Mapped[str | None] = mapped_column(String, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

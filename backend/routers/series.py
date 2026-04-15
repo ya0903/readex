@@ -1,5 +1,6 @@
 import os
 import shutil
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -134,6 +135,19 @@ async def _sync_komga_metadata(series: Series, force_cover: bool = False) -> str
     if final_path:
         try:
             _komga_scan(folder)
+        except Exception:
+            pass
+    # Record the sync so bulk "Sync All" can skip unchanged series later. We
+    # only mark as synced when we actually wrote a series.json, not when we
+    # only refreshed a cover — the cover alone isn't what Komga surfaces.
+    if json_path is not None:
+        try:
+            from sqlalchemy.orm import object_session
+            ses = object_session(series)
+            if ses is not None:
+                series.metadata_synced_at = datetime.utcnow()
+                series.metadata_synced_url = series.metadata_url
+                ses.commit()
         except Exception:
             pass
     return final_path
@@ -395,16 +409,21 @@ _sync_state: dict = {
     "total": 0,
     "processed": 0,
     "updated": 0,
+    "skipped": 0,
     "failed": 0,
     "failed_list": [],
     "current": None,
 }
 
 
-async def _bulk_sync_runner():
-    """Background task: re-sync every series's metadata + cover."""
+async def _bulk_sync_runner(force: bool = False):
+    """Background task: sync metadata + cover for series that need it.
+
+    Skips series that have already been synced with their current metadata_url
+    (as recorded by `metadata_synced_at`). Set `force=True` to bypass skip
+    logic and re-sync every series — useful after a Komga rebuild.
+    """
     from database import SessionLocal
-    from datetime import datetime
     s = SessionLocal()
     try:
         series_list = s.query(Series).all()
@@ -415,12 +434,21 @@ async def _bulk_sync_runner():
             "total": len(series_list),
             "processed": 0,
             "updated": 0,
+            "skipped": 0,
             "failed": 0,
             "failed_list": [],
             "current": None,
         })
         for series in series_list:
             _sync_state["current"] = series.title
+            # Skip: already synced with the current metadata_url (or with
+            # auto-lookup, where both stored and current URL are null).
+            if (not force
+                    and series.metadata_synced_at is not None
+                    and series.metadata_synced_url == series.metadata_url):
+                _sync_state["skipped"] += 1
+                _sync_state["processed"] += 1
+                continue
             try:
                 result = await _sync_komga_metadata(series, force_cover=True)
                 if result:
@@ -447,8 +475,13 @@ async def _bulk_sync_runner():
 
 
 @router.post("/metadata/sync-all")
-async def start_sync_all_metadata():
-    """Start a background metadata sync for every series.
+async def start_sync_all_metadata(force: bool = False):
+    """Start a background metadata sync.
+
+    By default, only processes series that haven't been synced with their
+    current `metadata_url` yet — a repeat click won't re-sync anything that's
+    already up to date. Pass `?force=true` to re-sync every series anyway
+    (e.g. after Komga loses its metadata and needs everything re-written).
 
     Returns immediately. Poll GET /api/series/metadata/sync-all/status for
     progress + results.
@@ -456,8 +489,8 @@ async def start_sync_all_metadata():
     import asyncio
     if _sync_state["status"] == "running":
         return {"status": "running", "message": "A sync is already in progress."}
-    asyncio.create_task(_bulk_sync_runner())
-    return {"status": "started"}
+    asyncio.create_task(_bulk_sync_runner(force=force))
+    return {"status": "started", "force": force}
 
 
 @router.get("/metadata/sync-all/status")
@@ -539,6 +572,11 @@ async def update_series(
 
     for field, value in fields.items():
         setattr(series, field, value)
+    # If the user changed the metadata URL, invalidate the sync marker so the
+    # next "Sync All" picks this series up instead of skipping it.
+    if metadata_changed:
+        series.metadata_synced_at = None
+        series.metadata_synced_url = None
     db.commit()
     db.refresh(series)
 

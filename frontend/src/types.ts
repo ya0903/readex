@@ -7,6 +7,7 @@ export interface Series {
   content_type: string;
   status: string;
   metadata_url: string | null;
+  metadata_synced_at: string | null;
   cover_url: string | null;
   created_at: string;
   updated_at: string;

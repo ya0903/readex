@@ -2,6 +2,7 @@ import io
 import re
 import zipfile
 import httpx
+import rarfile
 from selectolax.parser import HTMLParser
 from sources.base import ChapterInfo, SearchResult, SeriesInfo, SourceAdapter
 
@@ -122,12 +123,9 @@ class GetComicsSource(SourceAdapter):
             file_resp.raise_for_status()
             file_bytes = file_resp.content
 
-            # Attempt to unzip and extract images
+            # Attempt to unpack the archive (ZIP/CBZ or RAR/CBR) and extract images
             images = _extract_images_from_archive(file_bytes)
-            if images:
-                return images
-            # If extraction fails, return raw file bytes as single entry
-            return [file_bytes]
+            return images
         except Exception:
             return []
 
@@ -159,15 +157,43 @@ class GetComicsSource(SourceAdapter):
         return await self.get_chapters(series_id)
 
 
+IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+
+
 def _extract_images_from_archive(data: bytes) -> list[bytes]:
-    """Extract image files from a ZIP/CBZ archive. Returns empty list if not a valid ZIP."""
-    IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+    """Extract image files from a ZIP/CBZ or RAR/CBR archive.
+
+    Tries ZIP first (since CBZ/ZIP is most common on GetComics), then falls
+    back to RAR. Returns an empty list if neither format parses — callers
+    should treat that as "no pages" and surface an error, never write the
+    raw archive bytes back as a fake image.
+    """
+    # Try ZIP/CBZ
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
             image_names = sorted(
                 name for name in zf.namelist()
                 if any(name.lower().endswith(ext) for ext in IMAGE_EXTS)
             )
-            return [zf.read(name) for name in image_names]
-    except (zipfile.BadZipFile, Exception):
-        return []
+            if image_names:
+                return [zf.read(name) for name in image_names]
+    except zipfile.BadZipFile:
+        pass
+    except Exception:
+        pass
+
+    # Try RAR/CBR
+    try:
+        with rarfile.RarFile(io.BytesIO(data)) as rf:
+            image_names = sorted(
+                info.filename for info in rf.infolist()
+                if not info.is_dir() and any(info.filename.lower().endswith(ext) for ext in IMAGE_EXTS)
+            )
+            if image_names:
+                return [rf.read(name) for name in image_names]
+    except rarfile.Error:
+        pass
+    except Exception:
+        pass
+
+    return []

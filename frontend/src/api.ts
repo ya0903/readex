@@ -89,8 +89,11 @@ export const api = {
       komga_enabled: boolean;
       komga_rescan_triggered: boolean;
     }>(`/series/${id}/metadata/sync`, { method: 'POST' }),
-  startMetadataSync: () =>
-    request<{ status: string; message?: string }>('/series/metadata/sync-all', { method: 'POST' }),
+  startMetadataSync: (force: boolean = false) =>
+    request<{ status: string; force?: boolean; message?: string }>(
+      `/series/metadata/sync-all${force ? '?force=true' : ''}`,
+      { method: 'POST' }
+    ),
   getMetadataSyncStatus: () =>
     request<{
       status: 'idle' | 'running' | 'done' | 'error';
@@ -99,6 +102,7 @@ export const api = {
       total: number;
       processed: number;
       updated: number;
+      skipped: number;
       failed: number;
       failed_list: { id: number; title: string; reason: string }[];
       current: string | null;

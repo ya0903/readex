@@ -72,6 +72,7 @@ export default function Library() {
     total: number;
     processed: number;
     updated: number;
+    skipped: number;
     failed: number;
     failed_list: { id: number; title: string; reason: string }[];
     current: string | null;
@@ -102,12 +103,18 @@ export default function Library() {
     }
   }, [syncStatus?.status]);
 
-  async function syncAllMetadata() {
+  async function syncAllMetadata(event?: React.MouseEvent) {
     if (syncStatus?.status === 'running') return;
-    if (!window.confirm('Re-fetch metadata + cover art for every series in your library from AniList / MyAnimeList / Anime-Planet?\n\nThis runs in the background so you can navigate around / reload safely.')) return;
+    // Shift-click = force re-sync everything (even already-synced ones).
+    // Useful if Komga lost its metadata and needs a full rewrite.
+    const force = !!event?.shiftKey;
+    const prompt = force
+      ? 'FORCE re-sync metadata + cover art for EVERY series (including ones already synced)?\n\nThis runs in the background.'
+      : 'Sync metadata + cover art for series that haven\'t been synced yet (or whose metadata URL changed)?\n\nAlready-synced series will be skipped. Shift-click to force a full re-sync.\n\nThis runs in the background.';
+    if (!window.confirm(prompt)) return;
     setResultDismissed(false);
     try {
-      await api.startMetadataSync();
+      await api.startMetadataSync(force);
       const s = await api.getMetadataSyncStatus();
       setSyncStatus(s);
     } catch (e) {
@@ -323,9 +330,13 @@ export default function Library() {
                   ? `${syncStatus.processed} / ${syncStatus.total} processed${syncStatus.current ? ' · ' + syncStatus.current : ''}`
                   : (
                     <>
-                      Updated {syncStatus.updated} of {syncStatus.total} ·
+                      Updated {syncStatus.updated}
+                      {(syncStatus.skipped ?? 0) > 0 && (
+                        <span style={{ color: '#64748b' }}> · {syncStatus.skipped} already up to date</span>
+                      )}
+                      {' · '}
                       <span style={{ color: syncStatus.failed > 0 ? '#fbbf24' : '#22c55e', fontWeight: 600 }}>
-                        {' '}{syncStatus.failed} need manual setup
+                        {syncStatus.failed} need manual setup
                       </span>
                     </>
                   )}

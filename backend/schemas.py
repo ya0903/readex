@@ -57,6 +57,7 @@ class SeriesOut(BaseModel):
     content_type: str
     status: str
     metadata_url: str | None
+    metadata_synced_at: datetime | None = None
     cover_url: str | None
     created_at: datetime
     updated_at: datetime
