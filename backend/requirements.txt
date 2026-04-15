@@ -1,0 +1,12 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+sqlalchemy==2.0.40
+pydantic==2.11.2
+pydantic-settings==2.9.1
+httpx==0.28.1
+selectolax==0.3.29
+apscheduler==3.11.0
+playwright==1.52.0
+pytest==8.3.5
+pytest-asyncio==0.25.3
+pytest-httpx==0.35.0

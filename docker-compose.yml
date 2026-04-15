@@ -1,0 +1,42 @@
+services:
+  readex:
+    build: .
+    container_name: readex
+    ports:
+      - "3150:3100"
+    volumes:
+      - ./data:/app/data
+      # Mount your library folder(s) here. The first one is the default
+      # destination; uncomment the others to route content types separately
+      # (e.g. when you have a separate Komga library for comics).
+      - /path/to/your/manga:/library
+      # - /path/to/your/comics:/library-comics
+    environment:
+      - READEX_LIBRARY_PATH=/library
+      - READEX_DATABASE_URL=sqlite:////app/data/readex.db
+      # Optional per-content-type library paths (fall back to LIBRARY_PATH if unset)
+      # - READEX_MANGA_PATH=/library
+      # - READEX_MANHWA_PATH=/library
+      # - READEX_COMIC_PATH=/library-comics
+
+      # Optional: FlareSolverr endpoint for Cloudflare-protected sources
+      # (AsuraScans needs this). Spin up FlareSolverr separately.
+      # - READEX_FLARESOLVERR_URL=http://flaresolverr:8191/v1
+
+      # Optional: auto-remove imported series from Kaizoku (DB only, files kept)
+      # - READEX_KAIZOKU_URL=http://kaizoku:3000
+
+      # Optional: trigger Komga library rescans after metadata writes.
+      # Generate an API key in Komga → Account Settings → API Keys.
+      # - READEX_KOMGA_URL=http://komga:25600
+      # - READEX_KOMGA_API_KEY=
+    restart: unless-stopped
+
+# Uncomment if your FlareSolverr / Komga / Kaizoku containers live on a
+# different docker network. Find the network name with:
+#   docker inspect <container> --format '{{json .NetworkSettings.Networks}}'
+# networks:
+#   default:
+#   external_net:
+#     name: docker_default   # <-- replace with your network's actual name
+#     external: true
