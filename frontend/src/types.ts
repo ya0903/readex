@@ -59,6 +59,7 @@ export interface Schedule {
   id: number;
   series_id: number;
   interval_seconds: number;
+  check_time: string | null;
   last_checked_at: string | null;
   next_check_at: string | null;
   enabled: boolean;

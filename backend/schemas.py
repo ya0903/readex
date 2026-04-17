@@ -41,6 +41,7 @@ class ScheduleOut(BaseModel):
     id: int
     series_id: int
     interval_seconds: int
+    check_time: str | None = None
     last_checked_at: datetime | None
     next_check_at: datetime | None
     enabled: bool
@@ -122,11 +123,13 @@ class QueueItemOut(BaseModel):
 class ScheduleCreate(BaseModel):
     series_id: int
     interval_seconds: int
+    check_time: str | None = None
     enabled: bool = True
 
 
 class ScheduleUpdate(BaseModel):
     interval_seconds: int | None = None
+    check_time: str | None = None
     enabled: bool | None = None
 
 

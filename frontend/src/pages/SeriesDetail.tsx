@@ -13,9 +13,10 @@ function hashColor(title: string): string {
   return COLORS[Math.abs(hash) % COLORS.length];
 }
 
-function intervalLabel(seconds: number): string {
-  if (seconds >= 604800) return 'Weekly';
-  if (seconds >= 86400) return 'Daily';
+function intervalLabel(seconds: number, checkTime: string | null): string {
+  const timeSuffix = checkTime ? ` at ${checkTime}` : '';
+  if (seconds >= 604800) return `Weekly${timeSuffix}`;
+  if (seconds >= 86400) return `Daily${timeSuffix}`;
   if (seconds >= 43200) return 'Every 12 hours';
   if (seconds >= 21600) return 'Every 6 hours';
   return `Every ${Math.round(seconds / 3600)} hours`;
@@ -45,6 +46,7 @@ export default function SeriesDetail() {
   // Edit schedule state
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleVal, setScheduleVal] = useState('null');
+  const [checkTime, setCheckTime] = useState<string>('');
 
   // Edit metadata state
   const [editingMeta, setEditingMeta] = useState(false);
@@ -63,6 +65,7 @@ export default function SeriesDetail() {
       setNewTitle(d.title);
       setNewFolder(d.folder_name);
       setScheduleVal(d.schedule ? String(d.schedule.interval_seconds) : 'null');
+      setCheckTime(d.schedule?.check_time ?? '');
     } catch {
       setError('Failed to load series');
     } finally {
@@ -117,10 +120,12 @@ export default function SeriesDetail() {
         }
       } else {
         const secs = Number(scheduleVal);
+        // Only send check_time for Daily/Weekly intervals
+        const time = secs >= 86400 && checkTime ? checkTime : null;
         if (detail.schedule) {
-          await api.updateSchedule(detail.schedule.id, { interval_seconds: secs, enabled: true });
+          await api.updateSchedule(detail.schedule.id, { interval_seconds: secs, check_time: time, enabled: true });
         } else {
-          await api.createSchedule({ series_id: seriesId, interval_seconds: secs, enabled: true });
+          await api.createSchedule({ series_id: seriesId, interval_seconds: secs, check_time: time, enabled: true });
         }
       }
       flash('Schedule saved.');
@@ -299,7 +304,7 @@ export default function SeriesDetail() {
           <InfoLine label="Source" value={detail.source_name} />
           <InfoLine
             label="Schedule"
-            value={detail.schedule ? intervalLabel(detail.schedule.interval_seconds) : 'None'}
+            value={detail.schedule ? intervalLabel(detail.schedule.interval_seconds, detail.schedule.check_time) : 'None'}
           />
           {detail.metadata_url && (
             <div style={{ marginBottom: 8 }}>
@@ -348,6 +353,35 @@ export default function SeriesDetail() {
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+            {/* Time picker — visible when Daily or Weekly is selected */}
+            {Number(scheduleVal) >= 86400 && scheduleVal !== 'null' && (
+              <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <label style={{ color: '#94a3b8', fontSize: 11 }}>at</label>
+                <input
+                  type="time"
+                  value={checkTime}
+                  onChange={(e) => setCheckTime(e.target.value)}
+                  style={{
+                    ...inputStyle,
+                    width: 'auto',
+                    margin: 0,
+                    padding: '3px 8px',
+                    colorScheme: 'dark',
+                  }}
+                />
+                {checkTime && (
+                  <button
+                    onClick={() => setCheckTime('')}
+                    style={{
+                      background: 'none', border: 'none', color: '#64748b',
+                      fontSize: 11, cursor: 'pointer', padding: 0,
+                    }}
+                  >
+                    clear
+                  </button>
+                )}
+              </div>
+            )}
             <button
               onClick={handleSaveSchedule}
               style={{

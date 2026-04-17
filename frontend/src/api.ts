@@ -161,7 +161,7 @@ export const api = {
   getRecent: (limit = 20) => request<RecentDownload[]>(`/downloads/recent?limit=${limit}`),
 
   listSchedules: () => request<Schedule[]>('/schedules'),
-  createSchedule: (data: { series_id: number; interval_seconds: number; enabled?: boolean }) =>
+  createSchedule: (data: { series_id: number; interval_seconds: number; check_time?: string | null; enabled?: boolean }) =>
     request<Schedule>('/schedules', { method: 'POST', body: JSON.stringify(data) }),
   updateSchedule: (id: number, data: Partial<Schedule>) =>
     request<Schedule>(`/schedules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

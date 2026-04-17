@@ -32,6 +32,7 @@ def _ensure_schema():
             ("progress_total",   "ALTER TABLE download_queue ADD COLUMN progress_total INTEGER NOT NULL DEFAULT 0"),
             ("metadata_synced_at",  "ALTER TABLE series ADD COLUMN metadata_synced_at DATETIME"),
             ("metadata_synced_url", "ALTER TABLE series ADD COLUMN metadata_synced_url TEXT"),
+            ("check_time",          "ALTER TABLE schedules ADD COLUMN check_time TEXT"),
         ]:
             try:
                 conn.execute(text(ddl))
@@ -158,7 +159,17 @@ async def lifespan(app: FastAPI):
                 from datetime import timedelta
                 now = datetime.utcnow()
                 sched.last_checked_at = now
-                sched.next_check_at = now + timedelta(seconds=sched.interval_seconds)
+                if sched.check_time and sched.interval_seconds >= 86400:
+                    try:
+                        h, m = int(sched.check_time.split(":")[0]), int(sched.check_time.split(":")[1])
+                        candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                        if candidate <= now:
+                            candidate += timedelta(days=1)
+                        sched.next_check_at = candidate
+                    except Exception:
+                        sched.next_check_at = now + timedelta(seconds=sched.interval_seconds)
+                else:
+                    sched.next_check_at = now + timedelta(seconds=sched.interval_seconds)
             s.commit()
             if added > 0:
                 log.info(f"series {series_id} ({series.title}) — queued {added} new chapter(s)")
@@ -177,10 +188,20 @@ async def lifespan(app: FastAPI):
         from datetime import timedelta
         now = datetime.utcnow()
         for sch in db.query(Schedule).filter_by(enabled=True).all():
-            scheduler.add_job(sch.series_id, sch.interval_seconds)
-            # Estimate next run for the dashboard countdown (APScheduler will
-            # actually fire it at startup_time + interval).
-            sch.next_check_at = now + timedelta(seconds=sch.interval_seconds)
+            scheduler.add_job(sch.series_id, sch.interval_seconds, sch.check_time)
+            # Estimate next run for the dashboard countdown.
+            if sch.check_time and sch.interval_seconds >= 86400:
+                # Cron-based: compute next occurrence from HH:MM today
+                try:
+                    h, m = int(sch.check_time.split(":")[0]), int(sch.check_time.split(":")[1])
+                    candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                    if candidate <= now:
+                        candidate += timedelta(days=1)
+                    sch.next_check_at = candidate
+                except Exception:
+                    sch.next_check_at = now + timedelta(seconds=sch.interval_seconds)
+            else:
+                sch.next_check_at = now + timedelta(seconds=sch.interval_seconds)
         db.commit()
     finally:
         db.close()

@@ -75,6 +75,10 @@ class Schedule(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     series_id: Mapped[int] = mapped_column(Integer, ForeignKey("series.id"), nullable=False)
     interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Optional: run at a specific time of day instead of a rolling interval.
+    # Stored as "HH:MM" (24-hour). When set with Daily/Weekly interval,
+    # APScheduler uses a CronTrigger; otherwise falls back to IntervalTrigger.
+    check_time: Mapped[str | None] = mapped_column(String, nullable=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_check_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

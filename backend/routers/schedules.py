@@ -27,6 +27,7 @@ def create_schedule(
     existing = db.query(Schedule).filter_by(series_id=data.series_id).first()
     if existing:
         existing.interval_seconds = data.interval_seconds
+        existing.check_time = data.check_time
         existing.enabled = data.enabled
         db.commit()
         db.refresh(existing)
@@ -34,7 +35,7 @@ def create_schedule(
     else:
         sched = Schedule(
             series_id=data.series_id, interval_seconds=data.interval_seconds,
-            enabled=data.enabled,
+            check_time=data.check_time, enabled=data.enabled,
         )
         db.add(sched)
         db.commit()
@@ -43,7 +44,7 @@ def create_schedule(
     sc = _scheduler(request)
     if sc:
         if sched.enabled:
-            sc.add_job(sched.series_id, sched.interval_seconds)
+            sc.add_job(sched.series_id, sched.interval_seconds, sched.check_time)
         else:
             sc.remove_job(sched.series_id)
 
@@ -70,7 +71,7 @@ def update_schedule(
     sc = _scheduler(request)
     if sc:
         if schedule.enabled:
-            sc.add_job(schedule.series_id, schedule.interval_seconds)
+            sc.add_job(schedule.series_id, schedule.interval_seconds, schedule.check_time)
         else:
             sc.remove_job(schedule.series_id)
     return schedule
