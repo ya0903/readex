@@ -20,6 +20,8 @@ from sources.mangapill import MangaPillSource
 from sources.mangakatana import MangaKatanaSource
 from sources.getcomics import GetComicsSource
 from sources.readcomiconline import ReadComicOnlineSource
+from sources.webnovel import WebnovelSource
+from sources.wuxiaworld_site import WuxiaWorldSiteSource
 
 
 @asynccontextmanager
@@ -33,12 +35,40 @@ def _ensure_schema():
             ("metadata_synced_at",  "ALTER TABLE series ADD COLUMN metadata_synced_at DATETIME"),
             ("metadata_synced_url", "ALTER TABLE series ADD COLUMN metadata_synced_url TEXT"),
             ("check_time",          "ALTER TABLE schedules ADD COLUMN check_time TEXT"),
+            ("check_day_of_week",   "ALTER TABLE schedules ADD COLUMN check_day_of_week INTEGER"),
         ]:
             try:
                 conn.execute(text(ddl))
                 conn.commit()
             except Exception:
                 pass  # column already exists
+
+
+def _compute_next_check(now, interval_seconds: int, check_time: str | None, check_day_of_week: int | None):
+    """Compute next_check_at for the dashboard countdown.
+
+    Mirrors the trigger that SchedulerService builds: cron-style (HH:MM, optional
+    weekday) for Daily/Weekly when check_time is set, rolling interval otherwise.
+    """
+    from datetime import timedelta
+    if check_time and interval_seconds >= 86400:
+        try:
+            h, m = int(check_time.split(":")[0]), int(check_time.split(":")[1])
+        except (ValueError, IndexError):
+            return now + timedelta(seconds=interval_seconds)
+        candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if interval_seconds >= 604800:
+            # Weekly: bump to the next chosen weekday at HH:MM
+            target_dow = check_day_of_week if check_day_of_week is not None else 0
+            target_dow = max(0, min(6, int(target_dow)))
+            days_ahead = (target_dow - candidate.weekday()) % 7
+            if days_ahead == 0 and candidate <= now:
+                days_ahead = 7
+            return candidate + timedelta(days=days_ahead)
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        return candidate
+    return now + timedelta(seconds=interval_seconds)
 
 
 def _recover_stuck_jobs():
@@ -78,6 +108,7 @@ async def lifespan(app: FastAPI):
         MangaDexSource, AsuraScansSource,
         WeebCentralSource, MangaPillSource, MangaKatanaSource,
         GetComicsSource, ReadComicOnlineSource,
+        WebnovelSource, WuxiaWorldSiteSource,
     ]:
         registry.register(source_cls())
     app.state.source_registry = registry
@@ -159,17 +190,7 @@ async def lifespan(app: FastAPI):
                 from datetime import timedelta
                 now = datetime.utcnow()
                 sched.last_checked_at = now
-                if sched.check_time and sched.interval_seconds >= 86400:
-                    try:
-                        h, m = int(sched.check_time.split(":")[0]), int(sched.check_time.split(":")[1])
-                        candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
-                        if candidate <= now:
-                            candidate += timedelta(days=1)
-                        sched.next_check_at = candidate
-                    except Exception:
-                        sched.next_check_at = now + timedelta(seconds=sched.interval_seconds)
-                else:
-                    sched.next_check_at = now + timedelta(seconds=sched.interval_seconds)
+                sched.next_check_at = _compute_next_check(now, sched.interval_seconds, sched.check_time, sched.check_day_of_week)
             s.commit()
             if added > 0:
                 log.info(f"series {series_id} ({series.title}) — queued {added} new chapter(s)")
@@ -188,20 +209,13 @@ async def lifespan(app: FastAPI):
         from datetime import timedelta
         now = datetime.utcnow()
         for sch in db.query(Schedule).filter_by(enabled=True).all():
-            scheduler.add_job(sch.series_id, sch.interval_seconds, sch.check_time)
-            # Estimate next run for the dashboard countdown.
-            if sch.check_time and sch.interval_seconds >= 86400:
-                # Cron-based: compute next occurrence from HH:MM today
-                try:
-                    h, m = int(sch.check_time.split(":")[0]), int(sch.check_time.split(":")[1])
-                    candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
-                    if candidate <= now:
-                        candidate += timedelta(days=1)
-                    sch.next_check_at = candidate
-                except Exception:
-                    sch.next_check_at = now + timedelta(seconds=sch.interval_seconds)
-            else:
-                sch.next_check_at = now + timedelta(seconds=sch.interval_seconds)
+            scheduler.add_job(
+                sch.series_id, sch.interval_seconds,
+                sch.check_time, sch.check_day_of_week,
+            )
+            sch.next_check_at = _compute_next_check(
+                now, sch.interval_seconds, sch.check_time, sch.check_day_of_week
+            )
         db.commit()
     finally:
         db.close()

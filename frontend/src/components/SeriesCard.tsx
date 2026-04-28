@@ -10,6 +10,7 @@ function hashColor(title: string): string {
 
 function statusBadge(series: Series): { label: string; color: string } {
   if (series.content_type === 'comic') return { label: 'Comic', color: '#f59e0b' };
+  if (series.content_type === 'lightnovel') return { label: 'LN', color: '#06b6d4' };
   if (series.status === 'ongoing') return { label: 'Ongoing', color: '#22c55e' };
   if (series.status === 'complete') return { label: 'Complete', color: '#64748b' };
   return { label: series.status, color: '#64748b' };

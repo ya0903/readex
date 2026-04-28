@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     manga_path: str = ""
     manhwa_path: str = ""
     comic_path: str = ""
+    # Light novel library root. Unlike the others this is also editable from
+    # the Settings UI (persisted to data/settings.json) since light novels
+    # were added later and most users won't have an env var set for them.
+    lightnovel_path: str = ""
     concurrent_downloads: int = 3
     metadata_auto_lookup: bool = True
     default_schedule_interval: int = 21600  # 6 hours in seconds
@@ -20,7 +24,7 @@ class Settings(BaseSettings):
     flaresolverr_url: str = ""
     # Optional Kaizoku base URL — when set, importing into Readex will also
     # remove the matching series from Kaizoku (DB only, files preserved).
-    # Example: "http://kaizoku:3000" (docker network) or "http://your-host:2100"
+    # Example: "http://kaizoku:3000" (Docker network) or "http://192.168.1.2:2100"
     kaizoku_url: str = ""
     # Optional Komga base URL + API key — when set, Readex will trigger a
     # library re-scan after writing metadata so summaries/covers show up
@@ -41,6 +45,8 @@ class Settings(BaseSettings):
             return self.manhwa_path
         if ct == "comic" and self.comic_path:
             return self.comic_path
+        if ct == "lightnovel" and self.lightnovel_path:
+            return self.lightnovel_path
         return self.library_path
 
 

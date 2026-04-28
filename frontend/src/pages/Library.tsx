@@ -4,7 +4,7 @@ import { api } from '../api';
 import type { Series } from '../types';
 import SeriesCard from '../components/SeriesCard';
 
-type FilterType = 'all' | 'manga' | 'manhwa' | 'comic' | 'ongoing' | 'complete';
+type FilterType = 'all' | 'manga' | 'manhwa' | 'comic' | 'lightnovel' | 'ongoing' | 'complete';
 type SortType = 'recent' | 'alpha' | 'chapters';
 
 const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
@@ -12,6 +12,7 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
   { value: 'manga', label: 'Manga' },
   { value: 'manhwa', label: 'Manhwa' },
   { value: 'comic', label: 'Comics' },
+  { value: 'lightnovel', label: 'Light Novels' },
   { value: 'ongoing', label: 'Ongoing' },
   { value: 'complete', label: 'Complete' },
 ];
@@ -27,6 +28,7 @@ function applyFilter(series: Series[], filter: FilterType): Series[] {
     case 'manga': return series.filter((s) => s.content_type === 'manga');
     case 'manhwa': return series.filter((s) => s.content_type === 'manhwa');
     case 'comic': return series.filter((s) => s.content_type === 'comic');
+    case 'lightnovel': return series.filter((s) => s.content_type === 'lightnovel');
     case 'ongoing': return series.filter((s) => s.status === 'ongoing');
     case 'complete': return series.filter((s) => s.status === 'complete');
     default: return series;

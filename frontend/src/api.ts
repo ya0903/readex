@@ -73,6 +73,10 @@ export const api = {
     request<void>(`/series/${id}?delete_files=${deleteFiles}`, { method: 'DELETE' }),
   refreshSeries: (id: number) =>
     request<{ added: number; total: number }>(`/series/${id}/refresh`, { method: 'POST' }),
+  scanSeriesFiles: (id: number) =>
+    request<{ scanned: number; updated: number; missing: number }>(
+      `/series/${id}/scan-files`, { method: 'POST' }
+    ),
   deleteChapters: (seriesId: number, chapterIds: number[], deleteFiles: boolean = false) =>
     request<{ removed: number; files_removed: number }>(
       `/series/${seriesId}/chapters/delete`,
@@ -161,7 +165,7 @@ export const api = {
   getRecent: (limit = 20) => request<RecentDownload[]>(`/downloads/recent?limit=${limit}`),
 
   listSchedules: () => request<Schedule[]>('/schedules'),
-  createSchedule: (data: { series_id: number; interval_seconds: number; check_time?: string | null; enabled?: boolean }) =>
+  createSchedule: (data: { series_id: number; interval_seconds: number; check_time?: string | null; check_day_of_week?: number | null; enabled?: boolean }) =>
     request<Schedule>('/schedules', { method: 'POST', body: JSON.stringify(data) }),
   updateSchedule: (id: number, data: Partial<Schedule>) =>
     request<Schedule>(`/schedules/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),

@@ -25,27 +25,47 @@ class SchedulerService:
         if self._scheduler.running:
             self._scheduler.shutdown(wait=False)
 
-    def add_job(self, series_id: int, interval_seconds: int, check_time: str | None = None):
+    # APScheduler weekday names, indexed 0=Mon..6=Sun (matches Python's weekday()).
+    _DOW_NAMES = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+    def add_job(
+        self,
+        series_id: int,
+        interval_seconds: int,
+        check_time: str | None = None,
+        check_day_of_week: int | None = None,
+    ):
         """Schedule a recurring check for a series.
 
-        If `check_time` is set (as "HH:MM") and the interval is Daily (86400)
-        or Weekly (604800), uses a CronTrigger so the check fires at that
-        specific time of day. Otherwise falls back to an IntervalTrigger.
+        If `check_time` ("HH:MM") is set and the interval is Daily/Weekly,
+        uses a CronTrigger so the check fires at that specific time. For
+        Weekly, `check_day_of_week` (0=Mon..6=Sun) picks the day; defaults
+        to Monday if unset.
         """
         job_id = f"series_{series_id}"
-        trigger = self._make_trigger(interval_seconds, check_time)
+        trigger = self._make_trigger(interval_seconds, check_time, check_day_of_week)
         self._scheduler.add_job(
             self._check_func,
             trigger=trigger,
             id=job_id, args=[series_id], replace_existing=True,
         )
 
-    def _make_trigger(self, interval_seconds: int, check_time: str | None):
+    def _make_trigger(
+        self,
+        interval_seconds: int,
+        check_time: str | None,
+        check_day_of_week: int | None = None,
+    ):
         if check_time and interval_seconds >= 86400:
             hour, minute = self._parse_time(check_time)
             if interval_seconds >= 604800:
-                # Weekly — fire once a week at the given time (Monday)
-                return CronTrigger(day_of_week="mon", hour=hour, minute=minute)
+                # Weekly — fire once a week at the given time on the chosen day
+                dow_idx = check_day_of_week if check_day_of_week is not None else 0
+                dow_idx = max(0, min(6, int(dow_idx)))
+                return CronTrigger(
+                    day_of_week=self._DOW_NAMES[dow_idx],
+                    hour=hour, minute=minute,
+                )
             else:
                 # Daily — fire once a day at the given time
                 return CronTrigger(hour=hour, minute=minute)
@@ -67,8 +87,14 @@ class SchedulerService:
         except Exception:
             pass
 
-    def update_job(self, series_id: int, interval_seconds: int, check_time: str | None = None):
-        self.add_job(series_id, interval_seconds, check_time)
+    def update_job(
+        self,
+        series_id: int,
+        interval_seconds: int,
+        check_time: str | None = None,
+        check_day_of_week: int | None = None,
+    ):
+        self.add_job(series_id, interval_seconds, check_time, check_day_of_week)
 
     def get_job(self, series_id: int):
         job_id = f"series_{series_id}"

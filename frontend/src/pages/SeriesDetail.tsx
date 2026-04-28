@@ -13,9 +13,14 @@ function hashColor(title: string): string {
   return COLORS[Math.abs(hash) % COLORS.length];
 }
 
-function intervalLabel(seconds: number, checkTime: string | null): string {
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function intervalLabel(seconds: number, checkTime: string | null, dow: number | null): string {
   const timeSuffix = checkTime ? ` at ${checkTime}` : '';
-  if (seconds >= 604800) return `Weekly${timeSuffix}`;
+  if (seconds >= 604800) {
+    const day = dow !== null && dow >= 0 && dow <= 6 ? DAY_LABELS[dow] : 'Mon';
+    return `Weekly · ${day}${timeSuffix}`;
+  }
   if (seconds >= 86400) return `Daily${timeSuffix}`;
   if (seconds >= 43200) return 'Every 12 hours';
   if (seconds >= 21600) return 'Every 6 hours';
@@ -47,6 +52,7 @@ export default function SeriesDetail() {
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [scheduleVal, setScheduleVal] = useState('null');
   const [checkTime, setCheckTime] = useState<string>('');
+  const [checkDow, setCheckDow] = useState<number>(0);  // 0=Mon..6=Sun
 
   // Edit metadata state
   const [editingMeta, setEditingMeta] = useState(false);
@@ -66,6 +72,7 @@ export default function SeriesDetail() {
       setNewFolder(d.folder_name);
       setScheduleVal(d.schedule ? String(d.schedule.interval_seconds) : 'null');
       setCheckTime(d.schedule?.check_time ?? '');
+      setCheckDow(d.schedule?.check_day_of_week ?? 0);
     } catch {
       setError('Failed to load series');
     } finally {
@@ -120,12 +127,13 @@ export default function SeriesDetail() {
         }
       } else {
         const secs = Number(scheduleVal);
-        // Only send check_time for Daily/Weekly intervals
+        // Only send check_time for Daily/Weekly intervals; day_of_week only for Weekly
         const time = secs >= 86400 && checkTime ? checkTime : null;
+        const dow = secs >= 604800 ? checkDow : null;
         if (detail.schedule) {
-          await api.updateSchedule(detail.schedule.id, { interval_seconds: secs, check_time: time, enabled: true });
+          await api.updateSchedule(detail.schedule.id, { interval_seconds: secs, check_time: time, check_day_of_week: dow, enabled: true });
         } else {
-          await api.createSchedule({ series_id: seriesId, interval_seconds: secs, check_time: time, enabled: true });
+          await api.createSchedule({ series_id: seriesId, interval_seconds: secs, check_time: time, check_day_of_week: dow, enabled: true });
         }
       }
       flash('Schedule saved.');
@@ -192,6 +200,20 @@ export default function SeriesDetail() {
       flash(`Renamed${f !== detail.folder_name ? ' (folder moved on disk)' : ''}.`);
     } catch (e) {
       flash('Rename failed: ' + (e as Error).message);
+    }
+  }
+
+  async function handleScanFiles() {
+    try {
+      const r = await api.scanSeriesFiles(seriesId);
+      await load();
+      flash(
+        `Scanned ${r.scanned} file${r.scanned === 1 ? '' : 's'} on disk · ` +
+        `${r.updated} chapter${r.updated === 1 ? '' : 's'} marked downloaded` +
+        (r.missing > 0 ? ` · ${r.missing} previously-downloaded chapter${r.missing === 1 ? '' : 's'} no longer on disk` : '')
+      );
+    } catch (e) {
+      flash('Scan failed: ' + (e as Error).message);
     }
   }
 
@@ -304,7 +326,7 @@ export default function SeriesDetail() {
           <InfoLine label="Source" value={detail.source_name} />
           <InfoLine
             label="Schedule"
-            value={detail.schedule ? intervalLabel(detail.schedule.interval_seconds, detail.schedule.check_time) : 'None'}
+            value={detail.schedule ? intervalLabel(detail.schedule.interval_seconds, detail.schedule.check_time, detail.schedule.check_day_of_week) : 'None'}
           />
           {detail.metadata_url && (
             <div style={{ marginBottom: 8 }}>
@@ -338,6 +360,10 @@ export default function SeriesDetail() {
           Download All Missing
         </button>
 
+        <button style={sidebarBtnStyle} onClick={handleScanFiles}>
+          Scan Files
+        </button>
+
         {/* Edit Schedule */}
         <button style={sidebarBtnStyle} onClick={() => setEditingSchedule((v) => !v)}>
           Edit Schedule
@@ -353,6 +379,28 @@ export default function SeriesDetail() {
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+            {/* Day-of-week picker — visible when Weekly is selected */}
+            {Number(scheduleVal) >= 604800 && scheduleVal !== 'null' && (
+              <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <label style={{ color: '#94a3b8', fontSize: 11 }}>on</label>
+                <select
+                  value={checkDow}
+                  onChange={(e) => setCheckDow(Number(e.target.value))}
+                  style={{
+                    ...inputStyle,
+                    width: 'auto',
+                    margin: 0,
+                    padding: '3px 8px',
+                    cursor: 'pointer',
+                    colorScheme: 'dark',
+                  }}
+                >
+                  {DAY_LABELS.map((d, i) => (
+                    <option key={i} value={i}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* Time picker — visible when Daily or Weekly is selected */}
             {Number(scheduleVal) >= 86400 && scheduleVal !== 'null' && (
               <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>

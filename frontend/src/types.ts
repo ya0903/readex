@@ -60,6 +60,7 @@ export interface Schedule {
   series_id: number;
   interval_seconds: number;
   check_time: string | null;
+  check_day_of_week: number | null;
   last_checked_at: string | null;
   next_check_at: string | null;
   enabled: boolean;
@@ -79,6 +80,7 @@ export interface AppSettings {
   manga_path: string;
   manhwa_path: string;
   comic_path: string;
+  lightnovel_path: string;
   komga_url: string;
   komga_api_key_set: boolean;
   concurrent_downloads: number;

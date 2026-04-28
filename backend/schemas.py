@@ -10,7 +10,7 @@ class SeriesCreate(BaseModel):
     folder_name: str
     source_name: str
     source_id: str
-    content_type: str  # manga, manhwa, comic
+    content_type: str  # manga, manhwa, comic, lightnovel
     status: str  # ongoing, complete
     metadata_url: str | None = None
     cover_url: str | None = None
@@ -42,6 +42,7 @@ class ScheduleOut(BaseModel):
     series_id: int
     interval_seconds: int
     check_time: str | None = None
+    check_day_of_week: int | None = None
     last_checked_at: datetime | None
     next_check_at: datetime | None
     enabled: bool
@@ -124,12 +125,14 @@ class ScheduleCreate(BaseModel):
     series_id: int
     interval_seconds: int
     check_time: str | None = None
+    check_day_of_week: int | None = None
     enabled: bool = True
 
 
 class ScheduleUpdate(BaseModel):
     interval_seconds: int | None = None
     check_time: str | None = None
+    check_day_of_week: int | None = None
     enabled: bool | None = None
 
 
@@ -140,6 +143,7 @@ class SettingsOut(BaseModel):
     manga_path: str = ""
     manhwa_path: str = ""
     comic_path: str = ""
+    lightnovel_path: str = ""
     concurrent_downloads: int
     metadata_auto_lookup: bool
     default_schedule_interval: int
@@ -152,5 +156,6 @@ class SettingsUpdate(BaseModel):
     concurrent_downloads: int | None = None
     metadata_auto_lookup: bool | None = None
     default_schedule_interval: int | None = None
+    lightnovel_path: str | None = None
     komga_url: str | None = None
     komga_api_key: str | None = None

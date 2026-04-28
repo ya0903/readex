@@ -317,6 +317,25 @@ async def refresh_chapters(
     return {"added": added, "removed": removed, "total": total}
 
 
+@router.post("/{series_id}/scan-files")
+def scan_series_files(series_id: int, db: Session = Depends(get_db)):
+    """Reconcile chapter status with files on disk for a single series.
+
+    Marks chapters as "downloaded" when a matching CBZ exists, and flips
+    chapters back to "available" when their previously-recorded file is gone.
+    Useful after manual file moves, drive remounts, or partial deletions.
+    """
+    from services.library_scanner import LibraryScanner
+
+    series = db.get(Series, series_id)
+    if not series:
+        raise HTTPException(status_code=404, detail="Series not found")
+    scanner = LibraryScanner()
+    counts = scanner.scan_series(db, series)
+    db.commit()
+    return counts
+
+
 @router.post("/{series_id}/match-source")
 async def match_source(
     series_id: int,

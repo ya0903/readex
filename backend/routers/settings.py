@@ -39,6 +39,7 @@ def _to_out(registry) -> SettingsOut:
         manga_path=settings.manga_path,
         manhwa_path=settings.manhwa_path,
         comic_path=settings.comic_path,
+        lightnovel_path=settings.lightnovel_path,
         concurrent_downloads=settings.concurrent_downloads,
         metadata_auto_lookup=settings.metadata_auto_lookup,
         default_schedule_interval=settings.default_schedule_interval,
@@ -59,8 +60,8 @@ def update_settings(data: SettingsUpdate, request: Request):
     for field, value in data.model_dump(exclude_unset=True).items():
         if hasattr(settings, field):
             object.__setattr__(settings, field, value)
-            # Persist Komga settings so they survive restart
-            if field in ("komga_url", "komga_api_key"):
+            # Persist user-editable settings so they survive restart
+            if field in ("komga_url", "komga_api_key", "lightnovel_path"):
                 overrides[field] = value
     _save_overrides(overrides)
     return _to_out(request.app.state.source_registry)

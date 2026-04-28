@@ -62,19 +62,39 @@ class LibraryScanner:
     def scan(self, db: Session) -> None:
         all_series = db.query(Series).all()
         for series in all_series:
-            root = self._root_for(series)
-            folder = os.path.join(root, series.folder_name)
-            if not os.path.isdir(folder):
-                continue
+            self.scan_series(db, series)
+        db.commit()
 
-            on_disk = dict(_existing_paths(folder))  # {chapter_number: path}
-            if not on_disk:
-                continue
+    def scan_series(self, db: Session, series: Series) -> dict:
+        """Scan a single series's folder and reconcile chapter status with what's
+        on disk.
 
-            chapters = db.query(Chapter).filter_by(series_id=series.id).all()
-            for ch in chapters:
-                path = on_disk.get(ch.chapter_number)
-                if path and ch.status != "downloaded":
+        Returns counts: {scanned, updated, missing}.
+          - scanned: matching CBZ files found in the folder
+          - updated: chapters whose status was flipped to "downloaded"
+          - missing: chapters previously marked downloaded whose file is gone
+                     (those get flipped back to "available")
+        Caller is responsible for db.commit() if running in a transaction.
+        """
+        root = self._root_for(series)
+        folder = os.path.join(root, series.folder_name)
+        on_disk = dict(_existing_paths(folder)) if os.path.isdir(folder) else {}
+
+        chapters = db.query(Chapter).filter_by(series_id=series.id).all()
+        updated = 0
+        missing = 0
+        for ch in chapters:
+            path = on_disk.get(ch.chapter_number)
+            if path:
+                if ch.status != "downloaded" or ch.file_path != path:
                     ch.status = "downloaded"
                     ch.file_path = path
-        db.commit()
+                    updated += 1
+            else:
+                # File is gone but DB still says downloaded — drop back to
+                # available so the user knows it can be re-fetched.
+                if ch.status == "downloaded":
+                    ch.status = "available"
+                    ch.file_path = None
+                    missing += 1
+        return {"scanned": len(on_disk), "updated": updated, "missing": missing}

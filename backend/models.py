@@ -14,7 +14,7 @@ class Series(Base):
     folder_name: Mapped[str] = mapped_column(String, nullable=False)
     source_name: Mapped[str] = mapped_column(String, nullable=False)
     source_id: Mapped[str] = mapped_column(String, nullable=False)
-    content_type: Mapped[str] = mapped_column(String, nullable=False)  # manga, manhwa, comic
+    content_type: Mapped[str] = mapped_column(String, nullable=False)  # manga, manhwa, comic, lightnovel
     status: Mapped[str] = mapped_column(String, nullable=False)  # ongoing, complete
     metadata_url: Mapped[str | None] = mapped_column(String, nullable=True)
     # Tracks the last-successful metadata sync so bulk "Sync All" can skip
@@ -79,6 +79,9 @@ class Schedule(Base):
     # Stored as "HH:MM" (24-hour). When set with Daily/Weekly interval,
     # APScheduler uses a CronTrigger; otherwise falls back to IntervalTrigger.
     check_time: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Optional: weekday for Weekly schedules. 0=Mon..6=Sun. Ignored unless
+    # interval_seconds is Weekly (>=604800).
+    check_day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_check_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

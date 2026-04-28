@@ -55,6 +55,7 @@ export default function Settings() {
   const [defaultInterval, setDefaultInterval] = useState(0);
   const [komgaUrl, setKomgaUrl] = useState('');
   const [komgaApiKey, setKomgaApiKey] = useState('');
+  const [lightnovelPath, setLightnovelPath] = useState('');
 
   useEffect(() => {
     api.getSettings()
@@ -64,6 +65,7 @@ export default function Settings() {
         setMetaAutoLookup(s.metadata_auto_lookup);
         setDefaultInterval(s.default_schedule_interval);
         setKomgaUrl(s.komga_url || '');
+        setLightnovelPath(s.lightnovel_path || '');
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
@@ -78,6 +80,7 @@ export default function Settings() {
         metadata_auto_lookup: metaAutoLookup,
         default_schedule_interval: defaultInterval,
         komga_url: komgaUrl,
+        lightnovel_path: lightnovelPath.trim(),
       };
       // Only send the API key if the user typed a new one
       if (komgaApiKey.trim()) payload.komga_api_key = komgaApiKey.trim();
@@ -137,6 +140,22 @@ export default function Settings() {
             value={settings.comic_path || '(uses default library path)'} readOnly />
           <div style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>
             <code style={{ color: '#94a3b8' }}>READEX_COMIC_PATH</code> · restart Readex after changing
+          </div>
+        </div>
+
+        <div style={fieldWrap}>
+          <label style={labelStyle}>Light Novel Path</label>
+          <input
+            style={inputStyle}
+            placeholder="/library/lightnovels"
+            value={lightnovelPath}
+            onChange={(e) => setLightnovelPath(e.target.value)}
+          />
+          <div style={{ color: '#475569', fontSize: 11, marginTop: 4 }}>
+            Where light novels download to. Persisted to <code style={{ color: '#94a3b8' }}>data/settings.json</code> —
+            no restart needed. Leave blank to fall back to the default library path.
+            Webnovel + wuxiaworld.site sources are registered but their scrapers
+            aren't implemented yet, so downloads will fail until that lands.
           </div>
         </div>
 
